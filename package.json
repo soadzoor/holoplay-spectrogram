@@ -1,0 +1,30 @@
+{
+  "name": "Title",
+  "version": "1.0.0",
+  "description": "Title",
+  "main": "",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "node build/build",
+    "build:prod": "node build/build --prod"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/node": "16.11.6",
+    "@types/three": "0.133.1",
+    "esbuild": "0.13.12",
+    "holoplay": "1.0.3",
+    "shx": "0.3.3",
+    "three": "0.134.0",
+    "tslib": "2.3.1",
+    "typescript": "4.4.4",
+    "uglifycss": "0.0.29"
+  }
+}
