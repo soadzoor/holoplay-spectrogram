@@ -11,6 +11,7 @@
     "outDir": "build/prod/src",
     "noImplicitAny": false,
     "strictBindCallApply": true,
+    "allowSyntheticDefaultImports": true,
     "types": [
       "node"
     ],

@@ -1,12 +1,12 @@
 import {Scene, PerspectiveCamera, WebGLRenderer, AmbientLight, DirectionalLight, HemisphereLight, GammaEncoding, Vector2, Object3D, Vector3} from "three";
 import {CameraControls} from "./CameraControls";
-import {VignetteBackground} from "./VignetteBackground";
 import {Convergence, Easing} from "utils/Convergence";
 import {BoundedConvergence} from "utils/BoundedConvergence";
 import {Constants} from "utils/Constants";
-import {SpectogramLoader} from "./SpectogramLoader";
+import {SpectrogramLoader} from "./SpectrogramLoader";
 import {Line2} from "three/examples/jsm/lines/Line2";
 import {LineMaterial} from "three/examples/jsm/lines/LineMaterial";
+import TWEEN from "@tweenjs/tween.js";
 import * as Holoplay from "holoplay/dist/holoplay.module";
 
 export class SceneManager
@@ -19,10 +19,10 @@ export class SceneManager
 	private _camera: PerspectiveCamera | Holoplay.Camera;
 	private _controls: CameraControls;
 	private _renderer: WebGLRenderer | Holoplay.Renderer;
-	private _distance: BoundedConvergence = new BoundedConvergence(10, 10, 1, 100, Easing.EASE_OUT, Constants.ANIMATION_DURATION);
+	private _distance: BoundedConvergence = new BoundedConvergence(30, 30, 1, 100, Easing.EASE_OUT, Constants.ANIMATION_DURATION);
 	private _normalizedCameraPosition: number[] = [0, 0, 1];
 	private _origin: Vector3 = new Vector3(0, 0, 0);
-	private _chartLoader: SpectogramLoader;
+	private _chartLoader: SpectrogramLoader;
 
 	private _requestAnimationFrameId: number = null;
 	private static _timeStamp: number = 0;
@@ -56,13 +56,13 @@ export class SceneManager
 
 	private initBackground()
 	{
-		const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !((<any>window).MSStream);
+		// const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !((<any>window).MSStream);
 
-		this._scene.add(new VignetteBackground({
-			aspect: this._camera.aspect,
-			grainScale: IS_IOS ? 0 : 0.001, // mattdesl/three-vignette-background#1
-			colors: ["#ffffff", "#353535"]
-		}).mesh);
+		// this._scene.add(new VignetteBackground({
+		// 	aspect: this._camera.aspect,
+		// 	grainScale: IS_IOS ? 0 : 0.001, // mattdesl/three-vignette-background#1
+		// 	colors: ["#ffffff", "#353535"]
+		// }).mesh);
 	}
 
 
@@ -86,7 +86,7 @@ export class SceneManager
 
 	private initMeshes()
 	{
-		this._chartLoader = new SpectogramLoader(this);
+		this._chartLoader = new SpectrogramLoader(this);
 	}
 
 	private initRenderer()
@@ -167,6 +167,7 @@ export class SceneManager
 	private update = (time: number) =>
 	{
 		SceneManager._timeStamp = performance.now();
+		TWEEN.update();
 
 		this._requestAnimationFrameId = requestAnimationFrame(this.update);
 

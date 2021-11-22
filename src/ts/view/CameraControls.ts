@@ -41,7 +41,7 @@ export class CameraControls
 		triggerClickOnPointerUp: false
 	};
 	private _u: BoundedConvergence = new BoundedConvergence(0, 0, -Infinity, Infinity, Easing.EASE_OUT, Constants.DAMPING_DURATION);
-	private _v: BoundedConvergence = new BoundedConvergence(Math.PI / 2, Math.PI / 2, Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, Easing.EASE_OUT, Constants.DAMPING_DURATION);
+	private _v: BoundedConvergence = new BoundedConvergence(Math.PI / 2, Math.PI / 2, Math.PI / 2 - 1, Math.PI / 2 + 1, Easing.EASE_OUT, Constants.DAMPING_DURATION);
 	private _pinch: {
 		startValue: {
 			touchDistance: number;
@@ -61,12 +61,12 @@ export class CameraControls
 			distanceValue: null
 		}
 	};
-	private _cameraNormalizedPosition: number[] = VectorUtils.normalize([-1, 0.4, 1]);
-	private _timeoutID: number = null;
+	private _cameraNormalizedPosition: number[] = VectorUtils.normalize([2, 1, 1]);
+	private _timeoutId: number = null;
 	private _dampOnPointerUp: boolean = false;
 
 	private _enabled: boolean = false;
-	private _autoRotate: boolean = true;
+	private _autoRotate: boolean = false;
 
 	private readonly SENSITIVITY = 0.5;
 	private _prevSpeed: number[] = [];
@@ -232,8 +232,8 @@ export class CameraControls
 				this._pointer.prevTimeStamp = timeStamp;
 
 				this._dampOnPointerUp = true;
-				clearTimeout(this._timeoutID);
-				this._timeoutID = setTimeout(this.cancelDamping, 100) as any;
+				clearTimeout(this._timeoutId);
+				this._timeoutId = setTimeout(this.cancelDamping, 100) as any;
 			}
 		}
 	}
