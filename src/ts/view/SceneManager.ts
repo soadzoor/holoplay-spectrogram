@@ -1,13 +1,13 @@
 import {Scene, PerspectiveCamera, WebGLRenderer, AmbientLight, DirectionalLight, HemisphereLight, GammaEncoding, Vector2, Object3D, Vector3} from "three";
-import {CameraControls} from "./CameraControls";
 import {Convergence, Easing} from "utils/Convergence";
-import {BoundedConvergence} from "utils/BoundedConvergence";
-import {Constants} from "utils/Constants";
 import {SpectrogramLoader} from "./SpectrogramLoader";
 import {Line2} from "three/examples/jsm/lines/Line2";
 import {LineMaterial} from "three/examples/jsm/lines/LineMaterial";
 import TWEEN from "@tweenjs/tween.js";
 import * as Holoplay from "holoplay/dist/holoplay.module";
+import {BoundedConvergence} from "utils/BoundedConvergence";
+import {Constants} from "utils/Constants";
+import {CameraControls} from "./CameraControls";
 
 export class SceneManager
 {
@@ -19,8 +19,9 @@ export class SceneManager
 	private _camera: PerspectiveCamera | Holoplay.Camera;
 	private _controls: CameraControls;
 	private _renderer: WebGLRenderer | Holoplay.Renderer;
-	private _distance: BoundedConvergence = new BoundedConvergence(30, 30, 1, 100, Easing.EASE_OUT, Constants.ANIMATION_DURATION);
-	private _normalizedCameraPosition: number[] = [0, 0, 1];
+	private _distance: BoundedConvergence = new BoundedConvergence(40, 40, 1, 100, Easing.EASE_OUT, Constants.ANIMATION_DURATION);
+
+	public normalizedCameraPosition: number[] = [-0.8164965809277259, 0.4082482904638632, 0.40824829046386313];
 	private _origin: Vector3 = new Vector3(0, 0, 0);
 	private _chartLoader: SpectrogramLoader;
 
@@ -174,12 +175,18 @@ export class SceneManager
 		this.needsRender = Convergence.updateActiveOnes(SceneManager._timeStamp) || this.needsRender;
 		if (this.needsRender)
 		{
-			this._normalizedCameraPosition = this._controls.update();
+			if (this._controls.isActive)
+			{
+				this.normalizedCameraPosition = this._controls.update();
+			}
+
+			console.log(this.normalizedCameraPosition, this._distance.value);
 			this._camera.position.set(
-				this._normalizedCameraPosition[0] * this._distance.value,
-				this._normalizedCameraPosition[1] * this._distance.value,
-				this._normalizedCameraPosition[2] * this._distance.value
+				this.normalizedCameraPosition[0] * this._distance.value,
+				this.normalizedCameraPosition[1] * this._distance.value,
+				this.normalizedCameraPosition[2] * this._distance.value
 			);
+
 			this._camera.lookAt(this._origin);
 			this._renderer.render(this._scene, this._camera);
 			this.needsRender = false;
@@ -196,6 +203,11 @@ export class SceneManager
 	public static get timeStamp()
 	{
 		return SceneManager._timeStamp;
+	}
+
+	public setDistance(value: number)
+	{
+		this._distance.reset(value, value, undefined, undefined, false);
 	}
 
 	public get distance()

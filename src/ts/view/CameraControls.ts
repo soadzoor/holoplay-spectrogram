@@ -376,4 +376,9 @@ export class CameraControls
 			return this._cameraNormalizedPosition;
 		}
 	}
+
+	public get isActive()
+	{
+		return this._enabled;
+	}
 }
