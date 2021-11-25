@@ -22,11 +22,174 @@ export class SpectrogramLoader
 {
 	private _sceneManager: SceneManager;
 	private _geometry: BufferGeometry = new BufferGeometry();
+	private _flowDuration: number = 7500;
+	private _repeat: number = 1;
 
 	constructor(sceneManager: SceneManager)
 	{
 		this._sceneManager = sceneManager;
 		this.init();
+	}
+
+	private startCameraMovement(): Promise<void>
+	{
+		return new Promise<void>((resolve, reject) =>
+		{
+			const onCameraUpdate = (current: number[]) =>
+			{
+				this._sceneManager.normalizedCameraPosition[0] = current[0];
+				this._sceneManager.normalizedCameraPosition[1] = current[1];
+				this._sceneManager.normalizedCameraPosition[2] = current[2];
+				this._sceneManager.setDistance(current[3]);
+				this._sceneManager.needsRender = true;
+			};
+
+			const getCurrentCameraValues = () => [...this._sceneManager.normalizedCameraPosition, this._sceneManager.distance.value];
+			const cameraDefaultPos = getCurrentCameraValues();
+			const createNextCameraMovementTween = (nextCameraValues: number[], duration: number) =>
+			{
+				return new Tween<number[]>(getCurrentCameraValues()).to(nextCameraValues, duration).onUpdate(onCameraUpdate)
+			};
+
+			const cameraMovementTween = createNextCameraMovementTween(
+				[-0.9106513905111381, 0.31412872420934657, -0.26839744705704444, 22.578957202151088], 1000)
+				.onComplete(() => createNextCameraMovementTween([-0.9678970712950492, 0.2508563318577892, 0.015695863955869534, 48.400000000000006], 1000).delay(5000).start()
+				.onComplete(() => createNextCameraMovementTween([-0.726860246507532, 0.5131115782011404, -0.4564982917415408, 35.57895720215109], 1000).delay(8000).start()
+				.onComplete(() => createNextCameraMovementTween([-0.7911672485864805, -0.19429405112561007, 0.5799174134834175, 35.57895720215109], 5000).delay(500).start()
+				.onComplete(() => createNextCameraMovementTween([-0.9972536381755035, 0.062045484453842954, -0.04044179774206199, 35.57895720215109], 2000).delay(2000).start()
+				.onComplete(() => createNextCameraMovementTween(cameraDefaultPos, 2000).delay(2000).start()
+				.onComplete(() => resolve())
+			))))).delay(5000).start();
+		});
+	}
+
+	private startDataFlow(arrayOfSpectros: Mesh[], size: IVec3): Promise<void>
+	{
+		/**
+		 * Azt szeretném, ha egy az előzőhöz hasonló kameranézetből látnánk az “adatfolyót ömleni” felénk,
+		 * és az lenne az animáció, hogy egy ponton, pl 15 mp után egy, az idő tengelyre merőleges síkkal
+		 * elmetsszük a folyót, a síktól felénk eső rész kiscollozik a képből, látjuk a metszetet, ami
+		 * egy spektrogram, és azt egy más színű, a frekvenciatengelyen 0- 2kHz ig végigfutó vonal "letapogatja",
+		 * a lokális maximumokra egy világító pontot elhelyezve. A letapogatás után pedig a "folyó" hömpölyög tovább.
+		 */
+
+		return new Promise<void>((resolve, reject) =>
+		{
+			let resolvedAnimations: number = 0;
+			let animationCounter: number = 0;
+
+			const onComplete = () =>
+			{
+				resolvedAnimations++;
+				if (resolvedAnimations === animationCounter)
+				{
+					resolve();
+				}
+			};
+
+			for (let i = 0; i < arrayOfSpectros.length; ++i)
+			{
+				const spectroMesh = arrayOfSpectros[i];
+				const material = spectroMesh.material as MeshBasicMaterial;
+				material.opacity = 1;
+
+				const from: IVec3 = {
+					x: spectroMesh.userData.index * size.x,
+					y: spectroMesh.position.y,
+					z: spectroMesh.position.z,
+				};
+				const to: IVec3 = {
+					...from,
+					x: from.x - size.x
+				};
+
+				const onUpdate = (current: IVec3) =>
+				{
+					spectroMesh.position.set(current.x, current.y, current.z);
+					this._sceneManager.needsRender = true;
+				}
+
+				const flowTween = new Tween<IVec3>(from).to(to, this._flowDuration).repeat(this._repeat).onUpdate(onUpdate);
+
+				if (spectroMesh.userData.index <= 0)
+				{
+					flowTween.onComplete((current: IVec3) =>
+					{
+						const multiplicator = 1;
+						const startPoint = {
+							...current,
+							w: 1,
+						};
+						const endPoint = {
+							...current,
+							x: spectroMesh.position.x - size.x * multiplicator,
+							w: 0
+						};
+						animationCounter++;
+						new Tween<IVec4>(startPoint).to(endPoint, this._flowDuration * multiplicator).onUpdate((cur: IVec4) =>
+						{
+							onUpdate(cur);
+							material.opacity = cur.w;
+						})
+						.onComplete(onComplete)
+						.start()
+					});
+				}
+
+				flowTween.start();
+			}
+		});
+	}
+
+	private putFlownPartBack(arrayOfSpectros: Mesh[], size: IVec3): Promise<void>
+	{
+		return new Promise<void>((resolve, reject) =>
+		{
+			let resolvedAnimations: number = 0;
+			let animationCounter: number = 0;
+
+			const onComplete = () =>
+			{
+				resolvedAnimations++;
+				if (resolvedAnimations === animationCounter)
+				{
+					resolve();
+				}
+			};
+
+			for (let i = 0; i < arrayOfSpectros.length; ++i)
+			{
+				const spectroMesh = arrayOfSpectros[i];
+				if (spectroMesh.userData.index < 0)
+				{
+					const material = spectroMesh.material as MeshBasicMaterial;
+					const from: IVec4 = {
+						x: spectroMesh.position.x,
+						y: spectroMesh.position.y,
+						z: spectroMesh.position.z,
+						w: material.opacity
+					};
+					const to: IVec4 = {
+						...from,
+						x: size.x * spectroMesh.userData.index,
+						w: 1
+					};
+
+					const onUpdate = (current: IVec4) =>
+					{
+						spectroMesh.position.set(current.x, current.y, current.z);
+						material.opacity = current.w;
+						this._sceneManager.needsRender = true;
+					}
+
+					animationCounter++;
+					const flowTween = new Tween<IVec3>(from).to(to, this._flowDuration * 0.25)
+						.onUpdate(onUpdate)
+						.onComplete(onComplete)
+						.start();
+				}
+			}
+		});
 	}
 
 	private async init()
@@ -134,95 +297,6 @@ export class SpectrogramLoader
 			}
 		}
 
-		/**
-		 * Azt szeretném, ha egy az előzőhöz hasonló kameranézetből látnánk az “adatfolyót ömleni” felénk,
-		 * és az lenne az animáció, hogy egy ponton, pl 15 mp után egy, az idő tengelyre merőleges síkkal
-		 * elmetsszük a folyót, a síktól felénk eső rész kiscollozik a képből, látjuk a metszetet, ami
-		 * egy spektrogram, és azt egy más színű, a frekvenciatengelyen 0- 2kHz ig végigfutó vonal "letapogatja",
-		 * a lokális maximumokra egy világító pontot elhelyezve. A letapogatás után pedig a "folyó" hömpölyög tovább.
-		 */
-
-		const flowDuration = 7500;
-		const repeat = 1;
-
-		const onCameraUpdate = (current: number[]) =>
-		{
-			this._sceneManager.normalizedCameraPosition[0] = current[0];
-			this._sceneManager.normalizedCameraPosition[1] = current[1];
-			this._sceneManager.normalizedCameraPosition[2] = current[2];
-			this._sceneManager.setDistance(current[3]);
-			this._sceneManager.needsRender = true;
-		};
-
-		const getCurrentCameraValues = () => [...this._sceneManager.normalizedCameraPosition, this._sceneManager.distance.value];
-		const cameraDefaultPos = getCurrentCameraValues();
-		const createNextCameraMovementTween = (nextCameraValues: number[], duration: number) =>
-		{
-			return new Tween<number[]>(getCurrentCameraValues()).to(nextCameraValues, duration).onUpdate(onCameraUpdate)
-		};
-
-		const cameraMovementTween = createNextCameraMovementTween(
-			[-0.9106513905111381, 0.31412872420934657, -0.26839744705704444, 22.578957202151088], 1000)
-			.onComplete(() => createNextCameraMovementTween([-0.9678970712950492, 0.2508563318577892, 0.015695863955869534, 48.400000000000006], 1000).delay(5000).start()
-			.onComplete(() => createNextCameraMovementTween([-0.726860246507532, 0.5131115782011404, -0.4564982917415408, 35.57895720215109], 1000).delay(8000).start()
-			.onComplete(() => createNextCameraMovementTween([-0.7911672485864805, -0.19429405112561007, 0.5799174134834175, 35.57895720215109], 5000).delay(500).start()
-			.onComplete(() => createNextCameraMovementTween([-0.9972536381755035, 0.062045484453842954, -0.04044179774206199, 35.57895720215109], 2000).delay(2000).start()
-			.onComplete(() => createNextCameraMovementTween(cameraDefaultPos, 2000).delay(2000).start()))))
-		).delay(5000).start();
-
-		for (let i = 0; i < arrayOfSpectros.length; ++i)
-		{
-			const spectroMesh = arrayOfSpectros[i];
-			(spectroMesh.material as MeshBasicMaterial).opacity = 1;
-
-			const from: IVec3 = {
-				x: spectroMesh.position.x,
-				y: spectroMesh.position.y,
-				z: spectroMesh.position.z,
-			};
-			const to: IVec3 = {
-				...from,
-				x: spectroMesh.position.x - size.x
-			};
-
-			const onUpdate = (current: IVec3) =>
-			{
-				spectroMesh.position.set(current.x, current.y, current.z);
-				this._sceneManager.needsRender = true;
-			}
-
-			const flowTween = new Tween<IVec3>(from).to(to, flowDuration).repeat(repeat).onUpdate(onUpdate);
-
-			if (spectroMesh.userData.index <= 0)
-			{
-				flowTween.onComplete((current: IVec3) =>
-				{
-					const multiplicator = 2;
-					const startPoint = {
-						...current,
-						w: 1,
-					};
-					const endPoint = {
-						...current,
-						x: spectroMesh.position.x - size.x * multiplicator,
-						w: 0
-					};
-					new Tween<IVec4>(startPoint).to(endPoint, flowDuration * multiplicator).onUpdate((cur: IVec4) => {
-						onUpdate(cur);
-						(spectroMesh.material as MeshBasicMaterial).opacity = cur.w;
-					}).start();
-				});
-			}
-
-			flowTween.start();
-		}
-
-
-
-
-
-
-
 		const fogColor = new Color(0xffffff);
 
 		this._sceneManager.scene.background = fogColor;
@@ -231,5 +305,22 @@ export class SpectrogramLoader
 
 		// const axesHelper = new AxesHelper(5);
 		// this._sceneManager.scene.add(axesHelper);
+
+
+		this.startAnimations(arrayOfSpectros, size);
+	}
+
+	private async startAnimations(arrayOfSpectros: Mesh[], size: IVec3)
+	{
+		const promises = [
+			this.startCameraMovement(),
+			this.startDataFlow(arrayOfSpectros, size),
+		];
+
+		await Promise.all(promises);
+
+		await this.putFlownPartBack(arrayOfSpectros, size);
+
+		this.startAnimations(arrayOfSpectros, size);
 	}
 }

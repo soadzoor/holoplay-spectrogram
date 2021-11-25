@@ -180,7 +180,7 @@ export class SceneManager
 				this.normalizedCameraPosition = this._controls.update();
 			}
 
-			console.log(this.normalizedCameraPosition, this._distance.value);
+			//console.log(this.normalizedCameraPosition, this._distance.value);
 			this._camera.position.set(
 				this.normalizedCameraPosition[0] * this._distance.value,
 				this.normalizedCameraPosition[1] * this._distance.value,
