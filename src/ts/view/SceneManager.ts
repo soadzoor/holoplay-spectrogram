@@ -92,9 +92,11 @@ export class SceneManager
 
 	private initRenderer()
 	{
+		let webGLRenderer: WebGLRenderer = null;
 		if (this._isHolo)
 		{
 			this._renderer = new Holoplay.Renderer();
+			webGLRenderer = this._renderer.webglRenderer;
 		}
 		else
 		{
@@ -109,10 +111,12 @@ export class SceneManager
 				...contextAttributes
 			});
 			this._renderer.setPixelRatio(window.devicePixelRatio);
-			this._renderer.setClearColor(0xECF8FF);
-			(this._renderer as WebGLRenderer).localClippingEnabled = true;
-			this._renderer.outputEncoding = GammaEncoding;
+			webGLRenderer = this._renderer;
 		}
+		
+		webGLRenderer.setClearColor(0xECF8FF);
+		webGLRenderer.localClippingEnabled = true;
+		webGLRenderer.outputEncoding = GammaEncoding;
 
 		this._canvas = this._renderer.domElement;
 		this._domElement.appendChild(this._canvas);

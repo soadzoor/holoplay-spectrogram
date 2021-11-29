@@ -11,6 +11,7 @@ if (args.includes("--prod"))
 }
 const isProduction = process.env.NODE_ENV === "production";
 const buildFolder = isProduction ? BUILD_PROD : BUILD_DEV;
+const jsFile = `${buildFolder}/js/app.bundle.js`;
 const checkForTypeErrors = !args.includes("--fast");
 
 const {build} = require("esbuild");
@@ -53,10 +54,14 @@ async function buildApp()
 
 	const promises = [
 		css(buildFolder),
-		buildJs(buildFolder)
+		buildJs()
 	];
 
 	await Promise.all(promises);
+
+	// Hack to force "60" degrees to fov, which works a lot better for us
+	await replaceTextInFile(jsFile, `this.fov = 12.5`, `this.fov = 60`);
+	await replaceTextInFile(jsFile, `"fov": 12.5`, `"fov": 60`);
 
 	shx(`cp ${LOCAL_ROOT}/node_modules/three/build/three.js ${buildFolder}/js/three.js`);
 
@@ -161,10 +166,8 @@ function css(buildFolder)
 	shx(`cp -R src/css ${buildFolder}/css`);
 }
 
-function buildJs(buildFolder)
+function buildJs()
 {
-	const jsFile = `${buildFolder}/js/app.bundle.js`;
-
 	const options = {
 		entryPoints: ["./src/ts/Main.ts"],
 		target: "es2017",
