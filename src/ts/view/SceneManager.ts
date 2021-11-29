@@ -82,7 +82,7 @@ export class SceneManager
 	private initControls()
 	{
 		this._controls = new CameraControls(this._domElement, this);
-		this._controls.activate();
+		//this._controls.activate();
 	}
 
 	private initMeshes()

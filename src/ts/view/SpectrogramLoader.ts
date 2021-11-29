@@ -60,7 +60,6 @@ export class SpectrogramLoader
 
 			const onUpdate = (current: IClippingData) =>
 			{
-				console.log(current.constant);
 				this._clippingPlane.constant = current.constant;
 				this._sceneManager.needsRender = true;
 			};
