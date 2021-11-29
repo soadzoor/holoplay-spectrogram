@@ -63,6 +63,9 @@ async function buildApp()
 	await replaceTextInFile(jsFile, `this.fov = 12.5`, `this.fov = 60`);
 	await replaceTextInFile(jsFile, `"fov": 12.5`, `"fov": 60`);
 
+	await replaceTextInFile(jsFile, `this.fov=12.5`, `this.fov=60`);
+	await replaceTextInFile(jsFile, `fov:12.5`, `fov:60`);
+
 	shx(`cp ${LOCAL_ROOT}/node_modules/three/build/three.js ${buildFolder}/js/three.js`);
 
 	console.log("\x1b[32m%s\x1b[0m", "Build done!");
