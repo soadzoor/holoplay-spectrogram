@@ -1,10 +1,18 @@
-import {BufferAttribute, BufferGeometry, Color, Fog, Mesh, MeshBasicMaterial, Points, PointsMaterial, Vector3} from "three";
+import {AxesHelper, Box3, BufferAttribute, BufferGeometry, Color, Fog, Mesh, MeshBasicMaterial, Plane, Points, PointsMaterial, Vector2, Vector3} from "three";
+import {Line2} from "three/examples/jsm/lines/Line2";
+import {LineMaterial} from "three/examples/jsm/lines/LineMaterial";
+import {LineGeometry} from "three/examples/jsm/lines/LineGeometry";
 import Delaunator from "delaunator";
 import {ColorUtils} from "utils/ColorUtils";
 import {DataUtils} from "utils/DataUtils";
 import {MathUtils} from "utils/MathUtils";
 import {SceneManager} from "./SceneManager";
 import {Tween} from "@tweenjs/tween.js";
+
+interface IClippingData
+{
+	constant: number;
+}
 
 interface IVec3
 {
@@ -25,10 +33,56 @@ export class SpectrogramLoader
 	private _flowDuration: number = 7500;
 	private _repeat: number = 1;
 
+	// Thick line
+	private _line: Line2;
+	private _clippingPlane: Plane = new Plane(new Vector3(0, 0, -1), Number.MIN_SAFE_INTEGER);
+
 	constructor(sceneManager: SceneManager)
 	{
 		this._sceneManager = sceneManager;
 		this.init();
+	}
+
+	private startThickLineClipping(size: IVec3, scale: Vector3): Promise<void>
+	{
+		return new Promise<void>((resolve, reject) =>
+		{
+			const B = size.z / 2 * scale.z;
+			const A = -B;
+
+			const startData: IClippingData = {
+				constant: A
+			};
+
+			const endData: IClippingData = {
+				constant: B
+			};
+
+			const onUpdate = (current: IClippingData) =>
+			{
+				console.log(current.constant);
+				this._clippingPlane.constant = current.constant;
+				this._sceneManager.needsRender = true;
+			};
+
+			new Tween<IClippingData>(startData).to(endData).delay(21500).duration(5000).onUpdate(onUpdate).onComplete(() =>
+			{
+				const startData: IClippingData = {
+					constant: B
+				};
+
+				const endData: IClippingData = {
+					constant: A
+				};
+				new Tween<IClippingData>(startData).to(endData).delay(8000).duration(1000).onUpdate(onUpdate).onComplete(() =>
+				{
+					this._clippingPlane.constant = Number.MIN_SAFE_INTEGER;
+					resolve();
+				})
+				.start();
+			})
+			.start();
+		});
 	}
 
 	private startCameraMovement(): Promise<void>
@@ -192,6 +246,63 @@ export class SpectrogramLoader
 		});
 	}
 
+	private addLine(xyzArray: IVec3[], scale: Vector3, wireFrameBBox: Box3)
+	{
+		//const firstSliceXyzValues = [{x: 0, y: 0, z: 0}, {x: 10, y: 10, z: 0}, {x: 10, y: 0, z: 0}];
+
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxY = -Infinity;
+		for (const xyz of xyzArray)
+		{
+			if (xyz.x < minX)
+			{
+				minX = xyz.x;
+			}
+			if (xyz.y < minY)
+			{
+				minY = xyz.y;
+			}
+			if (xyz.y > maxY)
+			{
+				maxY = xyz.y;
+			}
+		}
+		const firstSliceXyzValues = xyzArray.filter(xyz => xyz.x === minX).sort((a: IVec3, b: IVec3) => a.x - b.x);
+		const firstSliceFloat32Array = new Float32Array(firstSliceXyzValues.flatMap(xyz => [xyz.x, xyz.y, xyz.z]));
+		
+		const lineGeometry = new LineGeometry();
+		lineGeometry.setPositions(firstSliceFloat32Array);
+		lineGeometry.center();
+
+		const lineColors = new Float32Array(firstSliceXyzValues.flatMap(xyz =>
+		{
+			const hue = MathUtils.getInterpolant(minY, 350, maxY, 180, xyz.y);
+			return ColorUtils.hsl2rgb(hue, 1, 0.5);
+		}));
+		const thickness = 0.25;
+		lineGeometry.setColors(lineColors);
+		const matLine = new LineMaterial({
+			//color: 0xFF0000,
+			linewidth: thickness, // in world units with size attenuation, pixels otherwise
+			vertexColors: true,
+			worldUnits: true,
+			resolution: new Vector2(window.innerWidth, window.innerHeight),  // to be set by renderer, eventually
+		});
+
+		this._line = new Line2(lineGeometry, matLine);
+		const bbox = new Box3().setFromObject(this._line);
+		this._line.scale.copy(scale);
+		this._line.position.setX(-(wireFrameBBox.max.x - wireFrameBBox.min.x) / 2 - thickness);
+
+		const offsetY = wireFrameBBox.max.y - bbox.max.y;
+		this._line.position.setY(offsetY * this._line.scale.y);
+
+		this._line.material.clippingPlanes = [this._clippingPlane];
+
+		this._sceneManager.scene.add(this._line);
+	}
+
 	private async init()
 	{
 		const data = await DataUtils.loadTxt("assets/data.txt");
@@ -257,6 +368,9 @@ export class SpectrogramLoader
 		//this._sceneManager.scene.add(points);
 
 
+		this.addLine(xyzArray, points.scale, bbox);
+
+
 		// triangulate x, z
 		const indexDelaunay = Delaunator.from(
 			xyzArray.map(v => [v.x, v.z])
@@ -303,24 +417,25 @@ export class SpectrogramLoader
 		this._sceneManager.scene.fog = new Fog(fogColor, 0.0025, 150);
 
 
-		// const axesHelper = new AxesHelper(5);
-		// this._sceneManager.scene.add(axesHelper);
+		//const axesHelper = new AxesHelper(5);
+		//this._sceneManager.scene.add(axesHelper);
 
 
-		this.startAnimations(arrayOfSpectros, size);
+		this.startAnimations(arrayOfSpectros, size, mesh.scale);
 	}
 
-	private async startAnimations(arrayOfSpectros: Mesh[], size: IVec3)
+	private async startAnimations(arrayOfSpectros: Mesh[], size: IVec3, scale: Vector3)
 	{
 		const promises = [
 			this.startCameraMovement(),
 			this.startDataFlow(arrayOfSpectros, size),
+			this.startThickLineClipping(size, scale),
 		];
 
 		await Promise.all(promises);
 
 		await this.putFlownPartBack(arrayOfSpectros, size);
 
-		this.startAnimations(arrayOfSpectros, size);
+		this.startAnimations(arrayOfSpectros, size, scale);
 	}
 }

@@ -110,6 +110,7 @@ export class SceneManager
 			});
 			this._renderer.setPixelRatio(window.devicePixelRatio);
 			this._renderer.setClearColor(0xECF8FF);
+			(this._renderer as WebGLRenderer).localClippingEnabled = true;
 			this._renderer.outputEncoding = GammaEncoding;
 		}
 
@@ -189,7 +190,7 @@ export class SceneManager
 
 			this._camera.lookAt(this._origin);
 			this._renderer.render(this._scene, this._camera);
-			this.needsRender = false;
+			//this.needsRender = false;
 		}
 	};
 
